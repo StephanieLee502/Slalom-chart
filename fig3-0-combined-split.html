@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All Events Combined – Gate Penalty Heatmap (SF / Final)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI",Arial,sans-serif;background:#fff;color:#111827;padding:10px 12px 8px}
+h3{font-size:.85rem;font-weight:700;color:#111827;margin-bottom:2px;letter-spacing:.01em}
+.sub{font-size:.7rem;color:#6b7280;margin-bottom:6px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:640px;table-layout:fixed}
+col.lbl{width:112px}
+col.gate{width:calc((100% - 112px)/22)}
+th,td{border:1px solid #e5e7eb;text-align:center;padding:0;height:28px;font-size:.68rem;font-weight:500}
+th.lbl{text-align:left;padding:0 8px;font-size:.67rem;font-weight:600;color:#374151;background:#f9fafb;white-space:nowrap;border-left:none}
+th.lbl.sf{border-left:3px solid #f97316}
+th.lbl.fin{border-left:3px solid #3b82f6}
+th.lbl.tot{border-left:3px solid #7c3aed}
+th.gh{font-size:.63rem;font-weight:700;color:#4b5563;background:#f3f4f6;height:24px}
+th.gh.up{background:#dbeafe;color:#1d4ed8}
+td.up{background:rgba(219,234,254,.28)}
+.sep td,.sep th{height:4px;background:#f3f4f6;border:none}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.li{display:flex;align-items:center;gap:5px;font-size:.68rem;color:#6b7280}
+.sw{width:12px;height:12px;border-radius:2px;flex-shrink:0}
+.tt{position:fixed;background:#1f2937;color:#f9fafb;padding:4px 9px;border-radius:5px;font-size:.7rem;pointer-events:none;display:none;white-space:nowrap;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+</style>
+</head>
+<body>
+<h3>All Events Combined: Gate Penalty Heatmap</h3>
+<p class="sub">2026 ICF Canoe Slalom World Championships &nbsp;|&nbsp; MK1 + MC1 + WC1 + WK1 &nbsp;|&nbsp; Semi-Final &amp; Final</p>
+<div class="scroll"><table id="t"></table></div>
+<div class="legend">
+  <div class="li"><div class="sw" style="background:#e07234"></div>Touch (×2 s)</div>
+  <div class="li"><div class="sw" style="background:#1c3e6b"></div>Miss (×50 s)</div>
+  <div class="li"><div class="sw" style="background:#7c3aed"></div>Total penalty (s)</div>
+  <div class="li"><div class="sw" style="background:#dbeafe;border:1px solid #bfdbfe"></div>Upstream gate</div>
+</div>
+<div class="tt" id="tt"></div>
+<script>
+const UP=new Set([5,7,11,14,17,22]);
+const G=22;
+
+// Per-event SF touch/miss (corrected from ICF Race Analysis PDFs)
+const k1mSfT=[2,1,0,3,0,0,2,1,0,0,0,0,0,1,0,2,1,3,0,2,2,2];
+const k1mSfM=[0,0,0,5,0,0,0,0,0,0,2,0,0,0,0,0,1,0,0,0,0,1];
+const mc1SfT=[0,1,0,2,3,0,2,0,1,0,2,0,2,0,2,2,3,0,0,0,0,0];
+const mc1SfM=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+const wc1SfT=[0,0,0,5,2,0,3,1,0,0,4,0,1,0,1,2,5,0,1,0,1,1];
+const wc1SfM=[0,0,0,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+const wk1SfT=[0,0,0,3,3,3,2,0,1,0,0,0,6,0,1,3,4,1,0,1,3,3];
+const wk1SfM=[0,0,0,3,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,0,0,0];
+
+// Per-event Final touch/miss
+const k1mFnT=[0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0];
+const k1mFnM=[0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+const mc1FnT=[1,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,3];
+const mc1FnM=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0];
+const wc1FnT=[0,0,0,3,0,0,0,0,0,0,0,0,1,0,0,1,1,0,0,0,0,3];
+const wc1FnM=[0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+const wk1FnT=[0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0];
+const wk1FnM=[0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+
+const sfT=Array.from({length:G},(_,i)=>k1mSfT[i]+mc1SfT[i]+wc1SfT[i]+wk1SfT[i]);
+const sfM=Array.from({length:G},(_,i)=>k1mSfM[i]+mc1SfM[i]+wc1SfM[i]+wk1SfM[i]);
+const fnT=Array.from({length:G},(_,i)=>k1mFnT[i]+mc1FnT[i]+wc1FnT[i]+wk1FnT[i]);
+const fnM=Array.from({length:G},(_,i)=>k1mFnM[i]+mc1FnM[i]+wc1FnM[i]+wk1FnM[i]);
+const totP=Array.from({length:G},(_,i)=>(sfT[i]+fnT[i])*2+(sfM[i]+fnM[i])*50);
+
+function mx(a){return Math.max(...a,1)}
+const tmx=mx([...sfT,...fnT]);
+const mmx=mx([...sfM,...fnM]);
+const pmx=mx(totP);
+
+function tBg(v){if(!v)return'';const a=Math.max(.18,v/tmx);return`background:rgba(224,114,52,${a.toFixed(2)})`}
+function mBg(v){if(!v)return'';const a=Math.max(.18,v/mmx);return`background:rgba(28,62,107,${a.toFixed(2)});color:#fff`}
+function pBg(v){if(!v)return'';const a=Math.max(.15,v/pmx);return`background:rgba(124,58,237,${a.toFixed(2)});color:${a>.45?'#fff':'#3b0764'}`}
+
+const rows=[
+  {lbl:'SF: Touch',  cls:'sf',  data:sfT, bg:tBg, tip:(g,v)=>`Gate ${g}: ${v} touch${v!==1?'es':''} in Semi-Final (+${v*2} s)`},
+  {lbl:'SF: Miss',   cls:'sf',  data:sfM, bg:mBg, tip:(g,v)=>`Gate ${g}: ${v} miss${v!==1?'es':''} in Semi-Final (+${v*50} s)`},
+  null,
+  {lbl:'Final: Touch', cls:'fin', data:fnT, bg:tBg, tip:(g,v)=>`Gate ${g}: ${v} touch${v!==1?'es':''} in Final (+${v*2} s)`},
+  {lbl:'Final: Miss',  cls:'fin', data:fnM, bg:mBg, tip:(g,v)=>`Gate ${g}: ${v} miss${v!==1?'es':''} in Final (+${v*50} s)`},
+  null,
+  {lbl:'Total Penalty (s)', cls:'tot', data:totP, bg:pBg, tip:(g,v)=>`Gate ${g}: ${v} s total penalty (${sfT[g-1]+fnT[g-1]}T + ${sfM[g-1]+fnM[g-1]}M)`},
+];
+
+const tbl=document.getElementById('t');
+const tt=document.getElementById('tt');
+
+const cg=document.createElement('colgroup');
+const c0=document.createElement('col'); c0.className='lbl'; cg.appendChild(c0);
+for(let i=0;i<G;i++){const c=document.createElement('col');c.className='gate';cg.appendChild(c);}
+tbl.appendChild(cg);
+
+const hdr=document.createElement('tr');
+const h0=document.createElement('th'); h0.className='lbl'; h0.textContent=''; hdr.appendChild(h0);
+for(let g=1;g<=G;g++){
+  const th=document.createElement('th');
+  th.className='gh'+(UP.has(g)?' up':'');
+  th.textContent=g; hdr.appendChild(th);
+}
+tbl.appendChild(hdr);
+
+rows.forEach(row=>{
+  if(!row){
+    const tr=document.createElement('tr'); tr.className='sep';
+    for(let i=0;i<=G;i++){tr.appendChild(document.createElement(i===0?'th':'td'));}
+    tbl.appendChild(tr); return;
+  }
+  const tr=document.createElement('tr');
+  const lbl=document.createElement('th');
+  lbl.className='lbl '+row.cls; lbl.textContent=row.lbl; tr.appendChild(lbl);
+  row.data.forEach((v,i)=>{
+    const g=i+1;
+    const td=document.createElement('td');
+    if(UP.has(g)) td.className='up';
+    const s=row.bg(v); if(s) td.setAttribute('style',s);
+    td.textContent=v||'';
+    const tip=row.tip(g,v);
+    td.addEventListener('mousemove',e=>{tt.style.display='block';tt.textContent=tip;tt.style.left=(e.clientX+12)+'px';tt.style.top=(e.clientY-34)+'px'});
+    td.addEventListener('mouseleave',()=>tt.style.display='none');
+    tr.appendChild(td);
+  });
+  tbl.appendChild(tr);
+});
+</script>
+</body>
+</html>
